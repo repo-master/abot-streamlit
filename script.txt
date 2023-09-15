@@ -1,0 +1,14 @@
+hello
+what can you do?
+list of warehouses
+status of verna
+any units out?
+b1 cipla temperature sensor status
+and rh?
+b1 cipla temperature sensor chart for yesterday, 1h interval
+rh sensor in same unit
+download xlsx
+b2 basement temperature
+get sensor max
+get unit status
+out of range unit list
