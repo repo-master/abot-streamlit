@@ -7,6 +7,7 @@ import requests
 import random
 from uuid import uuid4
 import plotly
+from abot_client import abot_chat
 
 
 B1_CIPLA_TEMP_CHART = "temp_chart.json"
@@ -231,8 +232,13 @@ def _msg_api(msg: str) -> Message:
         message="Unknown message for this demo :("
     )
 
+
+def _msg_abot_chat(msg: str) -> Message:
+    return None
+
+
 def submit_msg(msg: str, history) -> Future:
-    return st.session_state["tpe"].submit(_msg_api, msg)
+    return st.session_state["tpe"].submit(_msg_abot_chat, msg)
 
 
 "# ABOT"
