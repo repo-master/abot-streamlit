@@ -1,5 +1,6 @@
 import streamlit as st
 import numpy as np
+import json
 import time
 from typing import TypedDict, Optional
 from concurrent.futures import Future, ThreadPoolExecutor
@@ -95,12 +96,17 @@ class Message(TypedDict):
     kwargs: dict = {}
 
 
-if "tpe" not in st.session_state:
+if st.session_state.get("tpe") is None:
     st.session_state["tpe"] = ThreadPoolExecutor()
-if "sent_msg" not in st.session_state:
+
+if st.session_state.get("sent_msg") is None:
     st.session_state["sent_msg"] = None
-if "chat_message_history" not in st.session_state:
+
+if st.session_state.get("chat_message_history") is None:
     st.session_state["chat_message_history"] = []
+
+if st.session_state.get("sess_id")  is None:
+    st.session_state["sess_id"] = uuid4().hex
 
 if len(st.session_state["chat_message_history"]) == 0:
     st.session_state["chat_message_history"].append(Message(
@@ -234,7 +240,38 @@ def _msg_api(msg: str) -> Message:
 
 
 def _msg_abot_chat(msg: str) -> Message:
-    return None
+    try:
+        response = abot_chat(msg, st.session_state.get("sess_id"))
+        msg = response[0]
+        print(response)
+        attachments = []
+
+        if msg.get("attachment") is not None:
+            attachments.append({
+                "label": ":page_facing_up: View attachment",
+                "url": msg.get("attachment")
+            })
+
+        return Message(
+            role="ai",
+            message=msg["text"],
+            kwargs={
+                "buttons": [*[
+                    btn['title'] for btn in (msg.get("buttons") or [])
+                ], *attachments],
+                **(msg.get("custom", {}) or {})
+            }
+        )
+    except requests.HTTPError as ex:
+        return Message(
+            role="ai",
+            message=f'Error: {ex.response.json()["detail"]}',
+            kwargs={"color": "red"}
+        )
+    return Message(
+        role="ai",
+        message="Error: No response received"
+    )
 
 
 def submit_msg(msg: str, history) -> Future:
@@ -262,6 +299,10 @@ if msg is not None:
     send_message(msg)
 
 
+def open_url(url: str):
+    pass
+
+
 # All messages
 for message in st.session_state["chat_message_history"]:
     if message is None: continue
@@ -271,17 +312,26 @@ for message in st.session_state["chat_message_history"]:
 
         if message.get("kwargs") is not None:
             addt = message["kwargs"]
-            if "chart" in addt:
+            if addt.get("chart") is not None:
                 if addt["chart"]:
-                    fig = plotly.io.from_json(addt["chart"])
+                    fig = plotly.io.from_json(json.dumps(addt["chart"]))
                     fig.update_layout({
                         'plot_bgcolor': 'rgba(16,24,24,0.6)',
                     })
                     st.plotly_chart(fig, use_container_width=True)
-            if "buttons" in addt:
+            if addt.get("buttons"):
                 for btn in addt["buttons"]:
-                    btn_label = btn if isinstance(btn, str) else " ".join(btn)
-                    st.button(btn_label, key=btn_label+message.get("msg_id", ""), on_click=send_message, args=(btn_label,))
+                    if isinstance(btn, dict):
+                        from urllib.parse import quote_plus
+                        btn_label = btn["label"]
+                        btn_url = btn["url"].replace(" ", "%20")
+                        st.markdown(f"[{btn_label}]({btn_url})")
+                    else:
+                        if isinstance(btn, str):
+                            btn_label = btn
+                        elif isinstance(btn, tuple):
+                            btn_label = " ".join(btn)
+                        st.button(btn_label, key=btn_label+message.get("msg_id", ""), on_click=send_message, args=(btn_label,))
 
 # Sending message spinner
 if st.session_state["sent_msg"] is not None:
